@@ -49,7 +49,7 @@ body {
   color: var(--ink);
   font: 400 16px/1.55 var(--sans);
 }
-.wrap { max-width: 1120px; margin: 0 auto; padding: 0 clamp(14px, 3vw, 32px); }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 clamp(14px, 3vw, 32px); }
 .visually-hidden {
   position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap;
@@ -58,24 +58,53 @@ sup { font-size: .68em; line-height: 0; }
 b { font-weight: 700; }
 
 /* ---------- Hlavička ---------- */
-.top { padding-top: clamp(28px, 5vw, 56px); padding-bottom: clamp(18px, 3vw, 28px); }
+.top { padding-top: clamp(24px, 4vw, 48px); padding-bottom: clamp(16px, 2.4vw, 24px); }
 h1 {
-  margin: 0 0 .35em;
+  margin: 0;
   font-weight: 800;
   font-stretch: 125%;
   font-size: clamp(30px, 5.2vw, 56px);
   line-height: 1.02;
   letter-spacing: -.02em;
 }
-.lead { margin: 0; max-width: 64ch; font-size: 17px; color: var(--ink2); }
-
 /* ---------- Panel s IP a maskou ---------- */
 .board {
+  display: grid;
+  grid-template-columns: 14.5rem minmax(0, 1fr);
+  gap: 0 clamp(20px, 2.6vw, 34px);
+  align-items: start;
   background: var(--face);
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: clamp(14px, 2.6vw, 28px);
 }
+.board-main { min-width: 0; }
+
+/* zaškrtávací políčka vlevo */
+.toggles {
+  align-self: stretch;
+  padding-right: clamp(16px, 2vw, 26px);
+  border-right: 1px solid var(--line2);
+}
+.tg-title { margin: 0 0 10px; font-size: 16px; font-weight: 700; }
+.tg {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 15px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+.tg input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--ink);
+  cursor: pointer;
+}
+.tg input:focus-visible { outline: 3px solid var(--net); outline-offset: 2px; }
 
 .controls {
   display: grid;
@@ -267,6 +296,25 @@ h1 {
 .bit.host.one  { background: var(--host);      color: #2B1604; }
 .bit.host.zero { background: var(--host-tint); color: var(--host-ink); }
 .bit:hover { outline: 2px solid var(--ink); outline-offset: 1px; z-index: 3; }
+
+/* "Zesvětlit jedničky": jedničky bez plné barvy, jen o odstín sytější než nuly */
+.f-lighten .bit.net.one  { background: #BCCDF2; color: var(--net-ink); }
+.f-lighten .bit.host.one { background: #F7CFA3; color: var(--host-ink); }
+
+/* "Schovat binárku": řádek zůstane v rozložení s nulovou výškou,
+   aby posuvník pořád věděl, kde jsou hranice mezi bity */
+.f-hideipbin .bitrow.r-ip,
+.f-hidemaskbin .bitrow.r-mask { visibility: hidden; }
+.f-hideipbin .bitrow.r-ip .bit,
+.f-hidemaskbin .bitrow.r-mask .bit { height: 0; }
+.f-hideipbin .bitrow.r-ip .lab,
+.f-hidemaskbin .bitrow.r-mask .lab { display: none; }
+.f-hideipbin .decrow.r-ip .dec::after,
+.f-hidemaskbin .decrow.r-mask .dec::after { display: none; }
+.f-hideipbin .decrow.r-ip .dec,
+.f-hidemaskbin .decrow.r-mask .dec { padding-bottom: 4px; }
+.f-hideipbin .decrow.r-ip .sep,
+.f-hidemaskbin .decrow.r-mask .sep { padding-bottom: 9px; }
 
 /* svislá čára = hranice mezi sítí a hosty */
 .divider {
@@ -500,6 +548,18 @@ footer code { font: 500 12.5px var(--mono); }
 /* ---------- Mobil ---------- */
 @media (max-width: 700px) {
   :root { --lab: 0px; --sep: .45rem; --gap: 2px; }
+  .board { grid-template-columns: minmax(0, 1fr); }
+  .toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 18px;
+    margin-bottom: 14px;
+    padding: 0 0 8px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line2);
+  }
+  .tg-title { width: 100%; margin-bottom: 0; }
+  .tg { padding: 9px 0; }
   .controls { grid-template-columns: minmax(0, 1fr) auto; }
   .field-ip { grid-column: 1 / -1; }
   .examples { flex-wrap: nowrap; overflow-x: auto; margin-right: calc(-1 * clamp(14px, 2.6vw, 28px)); padding-bottom: 4px; scrollbar-width: none; }
@@ -529,7 +589,6 @@ footer code { font: 500 12.5px var(--mono); }
 
 <header class="top wrap">
   <h1>Kalkulačka masky sítě</h1>
-  <p class="lead">Napiš IP adresu a posouvej hranici mezi síťovou a hostitelskou částí. Uvidíš, jak se mění maska v desítkovém i binárním zápisu a co z toho vychází: síťová adresa, broadcast, wildcard i počet zařízení, která se do sítě vejdou.</p>
 </header>
 
 <main class="wrap">
@@ -538,6 +597,15 @@ footer code { font: 500 12.5px var(--mono); }
   <section class="board" aria-labelledby="board-title">
     <h2 id="board-title" class="visually-hidden">IP adresa a maska</h2>
 
+    <!-- zaškrtávací políčka vlevo -->
+    <div class="toggles" role="group" aria-labelledby="tg-title">
+      <h3 class="tg-title" id="tg-title">Zobrazení</h3>
+      <label class="tg"><input type="checkbox" data-f="lighten"><span>Zesvětlit jedničky</span></label>
+      <label class="tg"><input type="checkbox" data-f="hideipbin"><span>Schovat binárku IP adresy</span></label>
+      <label class="tg"><input type="checkbox" data-f="hidemaskbin"><span>Schovat binárku masky</span></label>
+    </div>
+
+    <div class="board-main">
     <div class="controls">
       <div class="field field-ip">
         <label class="field-label" for="ip">IP adresa</label>
@@ -574,6 +642,7 @@ footer code { font: 500 12.5px var(--mono); }
     <p class="summary" id="summary"></p>
     <p class="delta" id="delta" aria-live="polite">Posuň hranici nebo přepni bit a tady uvidíš, co se změnilo.</p>
     <p class="hint">Kliknutím na bit IP adresy ho přepneš. Kliknutím na bit masky se posune celá hranice, aby maska zůstala platná. Posuvník jde ovládat i klávesami <kbd>←</kbd> <kbd>→</kbd>, <kbd>PgUp</kbd> a <kbd>PgDn</kbd> skáčou po celých oktetech.</p>
+    </div>
   </section>
 
   <!-- =================== Výsledek =================== -->
@@ -788,8 +857,8 @@ footer code { font: 500 12.5px var(--mono); }
   for (let o = 0; o < 4; o++) for (let b = 0; b < 8; b++) wRow.append(place(el('div', 'w', W[b]), colOf(o, b)));
   addSeps(wRow, false);
 
-  function decRow(label) {
-    const r = makeRow('decrow', label);
+  function decRow(label, group) {
+    const r = makeRow('decrow ' + group, label);
     const cells = [], nums = [];
     for (let o = 0; o < 4; o++) {
       const c = place(el('div', 'dec'), colOf(o, 0), 8);
@@ -802,7 +871,7 @@ footer code { font: 500 12.5px var(--mono); }
   }
 
   function bitRow(kind) {
-    const r = makeRow('bitrow', 'binárně', true);
+    const r = makeRow('bitrow r-' + kind, 'binárně', true);
     const bits = [];
     for (let o = 0; o < 4; o++) {
       for (let b = 0; b < 8; b++) {
@@ -821,9 +890,9 @@ footer code { font: 500 12.5px var(--mono); }
     return { r, bits };
   }
 
-  const ipDec = decRow('IP adresa');
+  const ipDec = decRow('IP adresa', 'r-ip');
   const ipBits = bitRow('ip');
-  const maskDec = decRow('Maska');
+  const maskDec = decRow('Maska', 'r-mask');
   const maskBits = bitRow('mask');
 
   // posuvník (vlastní, aby jeho pozice seděly přesně na hranice mezi bity)
@@ -1317,11 +1386,32 @@ footer code { font: 500 12.5px var(--mono); }
   });
 
   /* ============================================================
+     Zaškrtávací políčka vlevo (prohlížeč si je pamatuje)
+     ============================================================ */
+  const OPTIONS = ['lighten', 'hideipbin', 'hidemaskbin'];
+  const STORE_KEY = 'maska-zobrazeni-v2';
+  const opts = {};
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+    OPTIONS.forEach((f) => { opts[f] = saved[f] === true; });
+  } catch (e) { /* bez localStorage se nastavení jen nepamatuje */ }
+
+  function applyOptions() {
+    OPTIONS.forEach((f) => document.body.classList.toggle('f-' + f, !!opts[f]));
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(opts)); } catch (e) { /* nevadí */ }
+    layout();
+  }
+  document.querySelectorAll('.tg input[data-f]').forEach((box) => {
+    box.checked = !!opts[box.dataset.f];
+    box.addEventListener('change', () => { opts[box.dataset.f] = box.checked; applyOptions(); });
+  });
+
+  /* ============================================================
      Start
      ============================================================ */
   loadFromHash();
   render();
-  layout();
+  applyOptions();
   if (window.ResizeObserver) {
     new ResizeObserver(() => { layout(); renderBlock(calc(state.ip, state.n)); }).observe(strip);
   } else {
