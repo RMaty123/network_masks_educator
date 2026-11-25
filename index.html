@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kalkulačka masky sítě</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='20' height='32' rx='4' fill='%232B59C3'/%3E%3Crect x='22' width='10' height='32' rx='3' fill='%23EE8F33'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Martian+Mono:wdth,wght@75..112.5,100..800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Barvy a písmo
+   Modrá = síťová část, oranžová = hostitelská část
+   (barvy párů v ethernetovém kabelu)
+   ============================================================ */
+:root {
+  --paper: #ECEFF3;
+  --face: #FFFFFF;
+  --ink: #17202B;
+  --ink2: #4D5867;
+  --ink3: #7C8796;
+  --line: #CBD3DC;
+  --line2: #E3E8EE;
+  --well: #F5F7FA;
+
+  --net: #2B59C3;
+  --net-tint: #E0E8FA;
+  --net-ink: #21469B;
+  --host: #EE8F33;
+  --host-tint: #FDEBD6;
+  --host-ink: #8E4508;
+  --ok: #2F8A57;
+  --bad: #C0392B;
+
+  --sans: "Archivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "Martian Mono", ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+
+  --lab: 6.75rem;   /* šířka sloupce s popisky v pásu bitů */
+  --sep: .85rem;    /* šířka tečky mezi oktety */
+  --gap: 3px;       /* mezera mezi bity */
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 16px/1.55 var(--sans);
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 clamp(14px, 3vw, 32px); }
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+sup { font-size: .68em; line-height: 0; }
+b { font-weight: 700; }
+
+/* ---------- Hlavička ---------- */
+.top { padding-top: clamp(28px, 5vw, 56px); padding-bottom: clamp(18px, 3vw, 28px); }
+h1 {
+  margin: 0 0 .35em;
+  font-weight: 800;
+  font-stretch: 125%;
+  font-size: clamp(30px, 5.2vw, 56px);
+  line-height: 1.02;
+  letter-spacing: -.02em;
+}
+.lead { margin: 0; max-width: 64ch; font-size: 17px; color: var(--ink2); }
+
+/* ---------- Panel s IP a maskou ---------- */
+.board {
+  background: var(--face);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: clamp(14px, 2.6vw, 28px);
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.1fr) auto;
+  gap: 14px 18px;
+  align-items: end;
+}
+.field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.text-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 7px;
+  background: var(--well);
+  color: var(--ink);
+  font: 500 clamp(16px, 2vw, 20px)/1.2 var(--mono);
+}
+.text-input:focus-visible,
+.stepper input:focus-visible {
+  outline: 3px solid rgba(43, 89, 195, .3);
+  border-color: var(--net);
+}
+.text-input[aria-invalid="true"] { border-color: var(--bad); }
+
+.stepper {
+  display: flex;
+  align-items: stretch;
+  border: 1.5px solid var(--line);
+  border-radius: 7px;
+  background: var(--well);
+  overflow: hidden;
+}
+.stepper:focus-within { border-color: var(--net); }
+.stepper button {
+  width: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 500 22px/1 var(--sans);
+  cursor: pointer;
+}
+.stepper button:hover { background: var(--line2); }
+.stepper button:focus-visible { outline: 3px solid var(--net); outline-offset: -3px; }
+.stepper .slash { align-self: center; padding-left: 2px; font: 500 20px var(--mono); color: var(--ink3); }
+.stepper input {
+  width: 3.4ch;
+  padding: 10px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 600 clamp(16px, 2vw, 20px)/1.2 var(--mono);
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.stepper input::-webkit-inner-spin-button,
+.stepper input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+.error {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #FBE9E7;
+  color: #8E2318;
+  font-size: 14.5px;
+}
+.error code { font-family: var(--mono); font-size: 13px; }
+
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.chip {
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: 500 13px/1.3 var(--sans);
+  cursor: pointer;
+}
+.chip b { font: 500 12px var(--mono); }
+.chip:hover { border-color: var(--ink3); background: var(--well); }
+.chip:focus-visible { outline: 3px solid var(--net); outline-offset: 2px; }
+.chip.random { border-style: dashed; }
+
+/* ---------- Pás bitů (hlavní část) ---------- */
+.strip {
+  position: relative;
+  margin-top: 26px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.row {
+  display: grid;
+  grid-template-columns:
+    var(--lab)
+    repeat(8, minmax(0, 1fr)) var(--sep)
+    repeat(8, minmax(0, 1fr)) var(--sep)
+    repeat(8, minmax(0, 1fr)) var(--sep)
+    repeat(8, minmax(0, 1fr));
+  column-gap: var(--gap);
+  align-items: center;
+}
+.lab {
+  grid-column: 1;
+  padding-right: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ink2);
+}
+.lab.sub { font-weight: 400; color: var(--ink3); }
+
+.w {
+  padding-bottom: 6px;
+  text-align: center;
+  font: 400 10px/1 var(--mono);
+  letter-spacing: -.04em;
+  color: var(--ink3);
+}
+/* tečka mezi oktety */
+.sep.dot::after {
+  content: "";
+  display: block;
+  width: 4px;
+  height: 4px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: var(--ink3);
+}
+.decrow .sep { align-self: end; padding-bottom: 17px; }
+.bitrow .sep { align-self: center; }
+
+.dec {
+  position: relative;
+  margin-top: 16px;
+  padding-bottom: 12px;
+  text-align: center;
+}
+.dec .num {
+  position: relative;
+  z-index: 2;
+  padding: 0 .25em;
+  background: var(--face);
+  font: 600 clamp(18px, 3vw, 34px)/1 var(--mono);
+  transition: color .15s;
+}
+.dec .num.is-net { color: var(--net-ink); }
+.dec .num.is-host { color: var(--host-ink); }
+/* závorka pod číslem = "tohle číslo je těchto 8 bitů" */
+.dec::after {
+  content: "";
+  position: absolute;
+  left: 4px; right: 4px; bottom: 3px;
+  height: 6px;
+  border: 1.5px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 3px 3px;
+}
+
+.bit {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: clamp(26px, 3.6vw, 40px);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  font: 600 clamp(10px, 1.7vw, 18px)/1 var(--mono);
+  cursor: pointer;
+  transition: background-color .15s, color .15s;
+}
+.bit.net.one   { background: var(--net);       color: #fff; }
+.bit.net.zero  { background: var(--net-tint);  color: var(--net-ink); }
+.bit.host.one  { background: var(--host);      color: #2B1604; }
+.bit.host.zero { background: var(--host-tint); color: var(--host-ink); }
+.bit:hover { outline: 2px solid var(--ink); outline-offset: 1px; z-index: 3; }
+
+/* svislá čára = hranice mezi sítí a hosty */
+.divider {
+  position: absolute;
+  z-index: 1;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ink);
+  pointer-events: none;
+  transition: left .12s ease-out;
+}
+
+/* posuvník */
+.track {
+  grid-column: 2 / -1;
+  position: relative;
+  height: 58px;
+  cursor: pointer;
+  touch-action: none;
+}
+.rail {
+  position: absolute;
+  left: 0; right: 0; top: 15px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--net) var(--x, 50%), var(--host) var(--x, 50%));
+}
+.tick {
+  position: absolute;
+  top: 24px;
+  width: 1px;
+  height: 5px;
+  margin-left: -.5px;
+  background: var(--ink3);
+}
+.tick.major { height: 9px; background: var(--ink2); }
+.tick-label {
+  position: absolute;
+  top: 36px;
+  transform: translateX(-50%);
+  font: 500 11px/1 var(--mono);
+  color: var(--ink3);
+}
+.handle {
+  position: absolute;
+  top: 17px;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font: 600 14px/1 var(--mono);
+  white-space: nowrap;
+  cursor: grab;
+  transition: left .12s ease-out, transform .12s;
+}
+.handle:focus-visible { outline: 3px solid var(--net); outline-offset: 2px; }
+.track.dragging .handle { cursor: grabbing; transform: translate(-50%, -50%) scale(1.08); }
+
+.summary { margin: 4px 0 0; font-size: clamp(16px, 1.8vw, 19px); }
+.summary .net { color: var(--net-ink); }
+.summary .host { color: var(--host-ink); }
+
+.delta {
+  min-height: 2.9em;
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--ink);
+  border-radius: 0 6px 6px 0;
+  background: var(--well);
+  color: var(--ink2);
+  font-size: 15px;
+}
+.hint { margin: 12px 0 0; font-size: 13px; color: var(--ink3); }
+kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--face);
+  font: 500 11px var(--mono);
+}
+
+/* ---------- Sekce pod panelem ---------- */
+.section { margin-top: clamp(40px, 6vw, 68px); }
+h2 {
+  margin: 0 0 18px;
+  font-weight: 800;
+  font-stretch: 112%;
+  font-size: clamp(22px, 2.8vw, 30px);
+  line-height: 1.15;
+  letter-spacing: -.01em;
+}
+.section-lead { margin: -6px 0 20px; max-width: 70ch; color: var(--ink2); }
+
+/* výsledek */
+.results-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  gap: 28px 44px;
+  align-items: start;
+}
+.addr {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.3fr);
+  gap: 6px 22px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.addr:last-child { border-bottom: 1px solid var(--line); }
+.addr h3 { margin: 0 0 2px; font-size: 16px; font-weight: 700; }
+.addr p { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--ink2); }
+.val-dec { font: 600 clamp(18px, 2.2vw, 24px)/1.2 var(--mono); }
+.val-bin {
+  margin-top: 5px;
+  font: 400 clamp(10px, 1.1vw, 12.5px)/1.5 var(--mono);
+  letter-spacing: -.02em;
+  overflow-wrap: anywhere;
+}
+.n { color: var(--net); }
+.h { color: var(--host-ink); }
+
+.fact { padding: 14px 0; border-top: 1px solid var(--line); }
+.fact:last-child { border-bottom: 1px solid var(--line); }
+.fact-num {
+  display: block;
+  font: 700 clamp(28px, 4vw, 44px)/1.05 var(--mono);
+  letter-spacing: -.03em;
+}
+.fact-num.ok { color: var(--ok); }
+.fact-lab { font-size: 14px; color: var(--ink2); }
+.fact h3 { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--ink2); }
+.fact p { margin: 0; }
+.fact .mono { font: 500 15px/1.5 var(--mono); }
+.fact .small { margin-top: 4px; font-size: 13.5px; line-height: 1.45; color: var(--ink2); }
+
+/* postup výpočtu */
+.steps { margin: 0; padding: 0; list-style: none; counter-reset: step; }
+.step {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr);
+  gap: 0 16px;
+  padding: 20px 0;
+  border-top: 1px solid var(--line);
+  counter-increment: step;
+}
+.step::before {
+  content: counter(step);
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  font: 700 14px/1 var(--mono);
+}
+.step h3 { margin: 4px 0 6px; font-size: 18px; font-weight: 700; }
+.step p { margin: 0 0 12px; max-width: 72ch; color: var(--ink2); }
+.step .after { margin: 10px 0 0; font-size: 14.5px; }
+.step .after code { font: 500 13px var(--mono); color: var(--ink); }
+
+.ops {
+  display: grid;
+  grid-template-columns: auto auto max-content auto;
+  gap: 5px 14px;
+  align-items: baseline;
+  width: fit-content;
+  max-width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--face);
+  font: 400 clamp(10.5px, 1.25vw, 14px)/1.4 var(--mono);
+  overflow-x: auto;
+}
+.oprow { display: contents; }
+.ops .op { font-weight: 700; color: var(--ink3); }
+.ops .lbl { font: 500 13px var(--sans); color: var(--ink2); }
+.ops .eq { color: var(--ink2); white-space: nowrap; }
+.oprow.res .bits, .oprow.res .eq { font-weight: 700; color: var(--ink); }
+.oprow.res .lbl { color: var(--ink); font-weight: 700; }
+.ops .rule { grid-column: 1 / -1; height: 0; border-top: 1.5px solid var(--ink); }
+.formula { font: 600 clamp(15px, 1.8vw, 19px)/1.7 var(--mono); }
+
+/* velikost bloku */
+.block-head { margin: 0 0 30px; font-size: 14px; color: var(--ink2); }
+.bwrap { position: relative; }
+.bbar {
+  display: flex;
+  gap: 1px;
+  height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--line);
+  overflow: hidden;
+}
+.bbar.dense { gap: 0; }
+.blk { flex: 1 1 0; min-width: 0; background: var(--face); }
+.bbar.dense .blk.alt { background: var(--well); }
+.blk.cur { background: var(--net-tint) !important; box-shadow: inset 0 0 0 2px var(--net); }
+.bmark {
+  position: absolute;
+  top: -7px; bottom: 18px;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--host);
+  pointer-events: none;
+}
+.bmark-label {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font: 600 12px var(--mono);
+  color: var(--host-ink);
+}
+.blabels { position: relative; height: 20px; margin-top: 4px; font: 500 11px/1 var(--mono); color: var(--ink3); }
+.blabels span { position: absolute; top: 2px; transform: translateX(-50%); }
+.blabels span.first { transform: none; }
+.blabels span.last { transform: translateX(-100%); }
+.block-text { margin: 14px 0 0; max-width: 72ch; }
+
+footer.wrap { margin-top: clamp(48px, 7vw, 80px); padding-top: 22px; padding-bottom: 40px; font-size: 13.5px; color: var(--ink2); }
+footer.wrap::before { content: ""; display: block; margin-bottom: 22px; border-top: 1px solid var(--line); }
+footer p { margin: 0; max-width: 80ch; }
+footer code { font: 500 12.5px var(--mono); }
+
+/* ---------- Mobil ---------- */
+@media (max-width: 700px) {
+  :root { --lab: 0px; --sep: .45rem; --gap: 2px; }
+  .controls { grid-template-columns: minmax(0, 1fr) auto; }
+  .field-ip { grid-column: 1 / -1; }
+  .examples { flex-wrap: nowrap; overflow-x: auto; margin-right: calc(-1 * clamp(14px, 2.6vw, 28px)); padding-bottom: 4px; scrollbar-width: none; }
+  .examples::-webkit-scrollbar { display: none; }
+  .chip { flex: none; }
+  .row > .lab { grid-column: 1 / -1; grid-row: 1; padding: 12px 0 2px; }
+  .row > :not(.lab) { grid-row: 2; }
+  .row.weights, .lab.sub { display: none; }
+  .dec { margin-top: 2px; }
+  .decrow .sep { padding-bottom: 14px; }
+  .bit { border-radius: 2px; }
+  .results-grid { grid-template-columns: 1fr; }
+  .addr { grid-template-columns: 1fr; }
+  .step { grid-template-columns: 1fr; gap: 10px; }
+  .ops { display: block; width: auto; }
+  .oprow { display: grid; grid-template-columns: 2.8em minmax(0, 1fr); padding: 3px 0; }
+  .oprow .bits, .oprow .eq { grid-column: 2; }
+  .ops .rule { display: block; margin: 4px 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="top wrap">
+  <h1>Kalkulačka masky sítě</h1>
+  <p class="lead">Napiš IP adresu a posouvej hranici mezi síťovou a hostitelskou částí. Uvidíš, jak se mění maska v desítkovém i binárním zápisu a co z toho vychází: síťová adresa, broadcast, wildcard i počet zařízení, která se do sítě vejdou.</p>
+</header>
+
+<main class="wrap">
+
+  <!-- =================== Panel: IP, maska, posuvník =================== -->
+  <section class="board" aria-labelledby="board-title">
+    <h2 id="board-title" class="visually-hidden">IP adresa a maska</h2>
+
+    <div class="controls">
+      <div class="field field-ip">
+        <label class="field-label" for="ip">IP adresa</label>
+        <input class="text-input" id="ip" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="192.168.1.10">
+      </div>
+      <div class="field field-mask">
+        <label class="field-label" for="mask">Maska</label>
+        <input class="text-input" id="mask" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="255.255.255.0">
+      </div>
+      <div class="field field-prefix">
+        <label class="field-label" for="cidr">Prefix (CIDR)</label>
+        <div class="stepper">
+          <button type="button" id="dec" aria-label="Zmenšit prefix o 1">−</button>
+          <span class="slash" aria-hidden="true">/</span>
+          <input id="cidr" type="number" min="0" max="32" step="1" inputmode="numeric">
+          <button type="button" id="inc" aria-label="Zvětšit prefix o 1">+</button>
+        </div>
+      </div>
+    </div>
+    <p class="error" id="error" role="alert" hidden></p>
+
+    <div class="examples" id="examples">
+      <span>Příklady:</span>
+      <button type="button" class="chip" data-v="192.168.1.10/24"><b>192.168.1.10/24</b> domácí síť</button>
+      <button type="button" class="chip" data-v="192.168.10.77/26"><b>192.168.10.77/26</b> učebna</button>
+      <button type="button" class="chip" data-v="172.16.45.200/20"><b>172.16.45.200/20</b> firma</button>
+      <button type="button" class="chip" data-v="10.0.0.1/30"><b>10.0.0.1/30</b> spoj mezi routery</button>
+      <button type="button" class="chip random" id="random">Náhodný příklad</button>
+    </div>
+
+    <!-- pás bitů se staví v JavaScriptu -->
+    <div class="strip" id="strip"></div>
+
+    <p class="summary" id="summary"></p>
+    <p class="delta" id="delta" aria-live="polite">Posuň hranici nebo přepni bit a tady uvidíš, co se změnilo.</p>
+    <p class="hint">Kliknutím na bit IP adresy ho přepneš. Kliknutím na bit masky se posune celá hranice, aby maska zůstala platná. Posuvník jde ovládat i klávesami <kbd>←</kbd> <kbd>→</kbd>, <kbd>PgUp</kbd> a <kbd>PgDn</kbd> skáčou po celých oktetech.</p>
+  </section>
+
+  <!-- =================== Výsledek =================== -->
+  <section class="section" aria-labelledby="res-title">
+    <h2 id="res-title">Výsledek</h2>
+    <div class="results-grid">
+      <div id="addr-list"></div>
+      <div id="facts"></div>
+    </div>
+  </section>
+
+  <!-- =================== Postup =================== -->
+  <section class="section" aria-labelledby="steps-title">
+    <h2 id="steps-title">Jak se to počítá</h2>
+    <p class="section-lead">Celý výpočet je pár operací s bity. Příklady níže se počítají z tvé adresy a mění se spolu s posuvníkem.</p>
+    <ol class="steps" id="steps"></ol>
+  </section>
+
+  <!-- =================== Velikost bloku =================== -->
+  <section class="section" aria-labelledby="block-title">
+    <h2 id="block-title">Velikost bloku: výpočet z hlavy</h2>
+    <p class="section-lead">Na písemku nebo zkoušku se hodí trik bez převádění do dvojkové soustavy. Najdi oktet, kde maska není 255, a odečti jeho hodnotu od 256. Vyjde velikost bloku a sítě pak začínají na jejích násobcích.</p>
+    <p class="block-head" id="block-head"></p>
+    <div class="bwrap">
+      <div class="bbar" id="bbar"></div>
+      <div class="bmark" id="bmark"><span class="bmark-label" id="bmark-label"></span></div>
+      <div class="blabels" id="blabels"></div>
+    </div>
+    <p class="block-text" id="block-text"></p>
+  </section>
+</main>
+
+<footer class="wrap">
+  <p>Všechno se počítá přímo v prohlížeči, nic se nikam neodesílá. Adresa stránky si pamatuje IP a prefix (třeba <code>index.html#192.168.1.10/24</code>), takže můžeš poslat odkaz na konkrétní příklad.</p>
+</footer>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ============================================================
+     Pomocné funkce pro práci s IPv4 (32bitové číslo bez znaménka)
+     ============================================================ */
+  const W = [128, 64, 32, 16, 8, 4, 2, 1];                 // váhy bitů v oktetu
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const $ = (s) => document.querySelector(s);
+  const el = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  };
+
+  const maskOf  = (n) => (n === 0 ? 0 : (0xFFFFFFFF << (32 - n)) >>> 0);
+  const octets  = (u) => [u >>> 24, (u >>> 16) & 255, (u >>> 8) & 255, u & 255];
+  const dotted  = (u) => octets(u).join('.');
+  const bin8    = (x) => x.toString(2).padStart(8, '0');
+  const bitAt   = (u, i) => (u >>> (31 - i)) & 1;           // i = 0 je bit úplně vlevo
+  const pow2    = (k) => Math.pow(2, k);
+  const fmt     = (x) => x.toLocaleString('cs-CZ');
+  const hex2    = (x) => x.toString(16).toUpperCase().padStart(2, '0');
+  const fromOct = (a, b, c, d) => ((a << 24) | (b << 16) | (c << 8) | d) >>> 0;
+
+  // české skloňování podle počtu: 1 bit, 2–4 bity, 5+ bitů
+  const plural = (n, one, few, many) => {
+    n = Math.abs(n);
+    if (n === 1) return one;
+    if (n >= 2 && n <= 4) return few;
+    return many;
+  };
+  const bitsWord = (n) => plural(n, 'bit', 'bity', 'bitů');
+  const adresWord = (n) => plural(n, 'adresa', 'adresy', 'adres');
+
+  /* Hlavní výpočet: všechno, co z IP a prefixu plyne */
+  function calc(ip, n) {
+    const mask = maskOf(n);
+    const wild = (~mask) >>> 0;
+    const net = (ip & mask) >>> 0;
+    const bc = (net | wild) >>> 0;
+    const h = 32 - n;
+    const total = pow2(h);
+    let usable, first, last;
+    if (n <= 30) {            // běžná síť: síťová a broadcast se odečítají
+      usable = total - 2;
+      first = (net + 1) >>> 0;
+      last = (bc - 1) >>> 0;
+    } else if (n === 31) {    // dvoubodový spoj (RFC 3021): obě adresy použitelné
+      usable = 2; first = net; last = bc;
+    } else {                  // /32: jediná adresa
+      usable = 1; first = net; last = net;
+    }
+    return { ip, n, mask, wild, net, bc, h, total, usable, first, last };
+  }
+
+  /* ---------- Čtení vstupů ---------- */
+  const IP_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?:\s*\/\s*(\d{1,2}))?$/;
+
+  function parseIP(str) {
+    const m = str.trim().match(IP_RE);
+    if (!m) return { error: 'IP adresa má čtyři čísla oddělená tečkou, třeba 192.168.1.10. Za lomítko můžeš rovnou napsat prefix: 192.168.1.10/24.' };
+    const p = m.slice(1, 5).map(Number);
+    if (p.some((x) => x > 255)) return { error: 'Každé ze čtyř čísel IP adresy musí být v rozsahu 0 až 255 (vejde se do 8 bitů).' };
+    let cidr = null;
+    if (m[5] !== undefined) {
+      cidr = Number(m[5]);
+      if (cidr > 32) return { error: 'Prefix za lomítkem může být 0 až 32, IPv4 adresa má jen 32 bitů.' };
+    }
+    return { ip: fromOct(p[0], p[1], p[2], p[3]), cidr };
+  }
+
+  function parseMask(str) {
+    const s = str.trim();
+    let m = s.match(/^\/?\s*(\d{1,2})$/);
+    if (m) {
+      const n = Number(m[1]);
+      if (n > 32) return { error: 'Prefix může být 0 až 32.' };
+      return { cidr: n };
+    }
+    m = s.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!m) return { error: 'Masku napiš jako čtyři čísla (255.255.255.0) nebo jako prefix (/24).' };
+    const p = m.slice(1, 5).map(Number);
+    if (p.some((x) => x > 255)) return { error: 'Každé číslo masky musí být v rozsahu 0 až 255.' };
+    const u = fromOct(p[0], p[1], p[2], p[3]);
+    const inv = (~u) >>> 0;
+    // platná maska = jedničky souvisle zleva, pak jen nuly → inverze je tvaru 0…01…1
+    if ((inv & (inv + 1)) !== 0) {
+      const b = octets(u).map(bin8).join('.');
+      return { error: `${p.join('.')} není platná maska. Binárně je to <code>${b}</code> a jedničky musí jít souvisle zleva, bez mezer mezi nimi.` };
+    }
+    let n = 0;
+    for (let i = 0; i < 32; i++) n += bitAt(u, i);
+    return { cidr: n };
+  }
+
+  /* ---------- Druh adresy a třída ---------- */
+  const PRIV = 'Používá se ve vnitřních sítích (doma, ve škole, ve firmě). Z internetu na ni přímo dosáhnout nejde, ven se dostane přes NAT.';
+  const DOC = 'Vyhrazená pro příklady v dokumentaci a učebnicích, v internetu se nesměruje.';
+  const SPECIAL = [
+    ['0.0.0.0', 8, 'Speciální rozsah „tato síť“', 'Adresy 0.x.x.x se běžným zařízením nepřidělují. 0.0.0.0 znamená „zatím žádná adresa“ nebo „všechny adresy“.'],
+    ['127.0.0.0', 8, 'Loopback', 'Adresa vlastního počítače (localhost). Paket nikdy neopustí zařízení.'],
+    ['10.0.0.0', 8, 'Privátní (RFC 1918)', PRIV],
+    ['172.16.0.0', 12, 'Privátní (RFC 1918)', PRIV],
+    ['192.168.0.0', 16, 'Privátní (RFC 1918)', PRIV],
+    ['100.64.0.0', 10, 'Sdílený prostor pro CGNAT', 'Poskytovatelé internetu ji používají pro NAT mezi sebou a zákazníky.'],
+    ['169.254.0.0', 16, 'Link-local (APIPA)', 'Zařízení si ji přidělí samo, když nedostane adresu z DHCP serveru.'],
+    ['192.0.2.0', 24, 'Dokumentační (TEST-NET-1)', DOC],
+    ['198.51.100.0', 24, 'Dokumentační (TEST-NET-2)', DOC],
+    ['203.0.113.0', 24, 'Dokumentační (TEST-NET-3)', DOC],
+    ['255.255.255.255', 32, 'Omezený broadcast', 'Všesměrová adresa pro místní síť, router ji dál nepouští.'],
+    ['224.0.0.0', 4, 'Multicast (třída D)', 'Skupinové vysílání pro víc příjemců najednou. Jednotlivým zařízením se nepřiděluje.'],
+    ['240.0.0.0', 4, 'Rezervovaná (třída E)', 'Vyhrazená pro experimenty, v běžných sítích se nepoužívá.'],
+  ].map(([base, len, name, desc]) => ({ base: parseIP(base).ip, mask: maskOf(len), name, desc }));
+
+  function addrType(ip) {
+    for (const r of SPECIAL) if (((ip & r.mask) >>> 0) === r.base) return r;
+    return { name: 'Veřejná', desc: 'Je jedinečná v celém internetu a dá se na ni dostat zvenku (pokud to dovolí firewall).' };
+  }
+
+  function classInfo(first) {
+    if (first < 128) return { cls: 'A', def: 8,  note: 'výchozí maska /8 (255.0.0.0)' };
+    if (first < 192) return { cls: 'B', def: 16, note: 'výchozí maska /16 (255.255.0.0)' };
+    if (first < 224) return { cls: 'C', def: 24, note: 'výchozí maska /24 (255.255.255.0)' };
+    if (first < 240) return { cls: 'D', def: null, note: 'multicast, maska se neurčuje' };
+    return { cls: 'E', def: null, note: 'rezervovaná, maska se neurčuje' };
+  }
+
+  /* Binární zápis s obarvením síťové (n) a hostitelské (h) části */
+  function binHTML(u, n) {
+    let out = '', cur = null, buf = '';
+    for (let i = 0; i < 32; i++) {
+      const cls = i < n ? 'n' : 'h';
+      if (cls !== cur) {
+        if (buf) out += `<span class="${cur}">${buf}</span>`;
+        buf = ''; cur = cls;
+      }
+      buf += bitAt(u, i);
+      if (i % 8 === 7 && i < 31) buf += '.';
+    }
+    return out + `<span class="${cur}">${buf}</span>`;
+  }
+
+  /* ============================================================
+     Stav aplikace
+     ============================================================ */
+  let state = { ip: fromOct(192, 168, 1, 10), n: 24 };
+  const errors = { ip: '', mask: '', cidr: '' };
+
+  /* ============================================================
+     Pás bitů: řádky s váhami, IP, maskou a posuvníkem
+     ============================================================ */
+  const strip = $('#strip');
+  const colOf = (o, b) => 2 + o * 9 + b;   // sloupec mřížky pro bit b v oktetu o
+  const sepCol = (o) => 10 + o * 9;        // sloupec tečky za oktetem o
+
+  function makeRow(cls, label, sub) {
+    const r = el('div', 'row ' + cls);
+    r.append(el('div', 'lab' + (sub ? ' sub' : ''), label));
+    strip.append(r);
+    return r;
+  }
+  function place(e, col, span) {
+    e.style.gridColumn = span ? `${col} / span ${span}` : String(col);
+    return e;
+  }
+  function addSeps(r, withDot) {
+    for (let o = 0; o < 3; o++) r.append(place(el('div', withDot ? 'sep dot' : 'sep'), sepCol(o)));
+  }
+
+  // váhy bitů
+  const wRow = makeRow('weights', 'Váha bitu', true);
+  for (let o = 0; o < 4; o++) for (let b = 0; b < 8; b++) wRow.append(place(el('div', 'w', W[b]), colOf(o, b)));
+  addSeps(wRow, false);
+
+  function decRow(label) {
+    const r = makeRow('decrow', label);
+    const cells = [], nums = [];
+    for (let o = 0; o < 4; o++) {
+      const c = place(el('div', 'dec'), colOf(o, 0), 8);
+      const s = el('span', 'num', '0');
+      c.append(s); r.append(c);
+      cells.push(c); nums.push(s);
+    }
+    addSeps(r, true);
+    return { r, cells, nums };
+  }
+
+  function bitRow(kind) {
+    const r = makeRow('bitrow', 'binárně', true);
+    const bits = [];
+    for (let o = 0; o < 4; o++) {
+      for (let b = 0; b < 8; b++) {
+        const i = o * 8 + b;
+        const btn = place(el('button', 'bit'), colOf(o, b));
+        btn.type = 'button';
+        btn.tabIndex = -1;
+        btn.dataset.i = i;
+        btn.title = `${i + 1}. bit, váha ${W[b]}`;
+        btn.addEventListener('click', () => (kind === 'ip' ? toggleIpBit(i) : toggleMaskBit(i)));
+        r.append(btn);
+        bits.push(btn);
+      }
+    }
+    addSeps(r, true);
+    return { r, bits };
+  }
+
+  const ipDec = decRow('IP adresa');
+  const ipBits = bitRow('ip');
+  const maskDec = decRow('Maska');
+  const maskBits = bitRow('mask');
+
+  // posuvník (vlastní, aby jeho pozice seděly přesně na hranice mezi bity)
+  const tRow = makeRow('trackrow', 'Prefix', true);
+  const track = el('div', 'track');
+  const rail = el('div', 'rail');
+  track.append(rail);
+  const ticks = [], tickLabels = [];
+  for (let n = 0; n <= 32; n++) {
+    const t = el('div', 'tick' + (n % 8 === 0 ? ' major' : ''));
+    track.append(t); ticks.push(t);
+    if (n % 8 === 0) {
+      const l = el('div', 'tick-label', '/' + n);
+      track.append(l); tickLabels.push([n, l]);
+    }
+  }
+  const handle = el('div', 'handle');
+  handle.tabIndex = 0;
+  handle.setAttribute('role', 'slider');
+  handle.setAttribute('aria-label', 'Prefix masky (CIDR)');
+  handle.setAttribute('aria-valuemin', '0');
+  handle.setAttribute('aria-valuemax', '32');
+  track.append(handle);
+  tRow.append(track);
+
+  const divider = el('div', 'divider');
+  divider.setAttribute('aria-hidden', 'true');
+  strip.append(divider);
+
+  /* Pozice hranic 0–32 se měří z vykreslených bitů, takže sedí na každé šířce okna */
+  let xs = [];
+  function layout() {
+    const tr = track.getBoundingClientRect();
+    const rects = ipBits.bits.map((b) => b.getBoundingClientRect());
+    xs = [];
+    for (let n = 0; n <= 32; n++) {
+      let x;
+      if (n === 0) x = rects[0].left - 1.5;
+      else if (n === 32) x = rects[31].right + 1.5;
+      else x = (rects[n - 1].right + rects[n].left) / 2;
+      xs.push(x - tr.left);
+    }
+    ticks.forEach((t, n) => { t.style.left = xs[n] + 'px'; });
+    tickLabels.forEach(([n, l]) => { l.style.left = xs[n] + 'px'; });
+    positionHandle();
+  }
+
+  function positionHandle() {
+    if (!xs.length) return;
+    const x = xs[state.n];
+    handle.style.left = x + 'px';
+    track.style.setProperty('--x', x + 'px');
+    const sr = strip.getBoundingClientRect();
+    const tr = track.getBoundingClientRect();
+    const top = ipDec.cells[0].getBoundingClientRect().top - sr.top;
+    const bottom = tr.top - sr.top + 17;
+    divider.style.left = (x + tr.left - sr.left) + 'px';
+    divider.style.top = top + 'px';
+    divider.style.height = Math.max(0, bottom - top) + 'px';
+  }
+
+  function paintBit(btn, v, isNet) {
+    const txt = String(v);
+    if (btn.textContent !== txt) {
+      if (btn.textContent !== '' && !reduceMotion && btn.animate) {
+        btn.animate([{ transform: 'rotateX(90deg)' }, { transform: 'none' }], { duration: 220, easing: 'ease-out' });
+      }
+      btn.textContent = txt;
+    }
+    btn.classList.toggle('one', v === 1);
+    btn.classList.toggle('zero', v === 0);
+    btn.classList.toggle('net', isNet);
+    btn.classList.toggle('host', !isNet);
+  }
+
+  function paintDec(nums, values, n) {
+    nums.forEach((s, o) => {
+      s.textContent = values[o];
+      const start = o * 8, end = o * 8 + 8;
+      s.classList.toggle('is-net', end <= n);
+      s.classList.toggle('is-host', start >= n);
+    });
+  }
+
+  /* ============================================================
+     Vykreslení všeho podle stavu
+     ============================================================ */
+  const ipInput = $('#ip'), maskInput = $('#mask'), cidrInput = $('#cidr');
+
+  function render(source) {
+    const c = calc(state.ip, state.n);
+
+    paintDec(ipDec.nums, octets(c.ip), c.n);
+    paintDec(maskDec.nums, octets(c.mask), c.n);
+    for (let i = 0; i < 32; i++) {
+      paintBit(ipBits.bits[i], bitAt(c.ip, i), i < c.n);
+      paintBit(maskBits.bits[i], bitAt(c.mask, i), i < c.n);
+    }
+
+    handle.textContent = '/' + c.n;
+    handle.setAttribute('aria-valuenow', String(c.n));
+    handle.setAttribute('aria-valuetext', `/${c.n}: ${c.n} ${bitsWord(c.n)} pro síť, ${c.h} ${bitsWord(c.h)} pro hosty`);
+    positionHandle();
+
+    $('#summary').innerHTML =
+      `<b class="net">${c.n} ${bitsWord(c.n)}</b> patří síti, ` +
+      `<b class="host">${c.h} ${bitsWord(c.h)}</b> ${plural(c.h, 'zbývá', 'zbývají', 'zbývá')} pro zařízení. ` +
+      `V síti je tedy 2<sup>${c.h}</sup> = ${fmt(c.total)} ${adresWord(c.total)}.`;
+
+    // vstupní pole: nepřepisovat to, do kterého uživatel právě píše
+    if (source !== 'ip') ipInput.value = dotted(c.ip);
+    if (source !== 'mask') maskInput.value = dotted(c.mask);
+    if (source !== 'cidr') cidrInput.value = c.n;
+
+    renderResults(c);
+    renderSteps(c);
+    renderBlock(c);
+
+    try { history.replaceState(null, '', '#' + dotted(c.ip) + '/' + c.n); } catch (e) { /* file:// v některých prohlížečích */ }
+  }
+
+  /* ---------- Výsledek ---------- */
+  function renderResults(c) {
+    $('#res-title').textContent = `Výsledek pro ${dotted(c.ip)}/${c.n}`;
+
+    let d;
+    if (c.n <= 30) {
+      d = {
+        net: 'Označuje celou síť. Hostitelské bity jsou samé nuly, zařízení ji dostat nemůže.',
+        first: 'Síťová adresa + 1. Často ji dostává router jako výchozí brána.',
+        last: 'Broadcast − 1. Poslední adresa, kterou můžeš dát zařízení.',
+        bc: 'Hostitelské bity jsou samé jedničky. Co se pošle sem, dostanou všechna zařízení v síti.',
+      };
+    } else if (c.n === 31) {
+      d = {
+        net: 'U /31 se nevyhrazuje, je to zároveň první adresa pro zařízení.',
+        first: 'Jeden konec spoje mezi dvěma routery.',
+        last: 'Druhý konec spoje.',
+        bc: 'U /31 se broadcast nepoužívá (RFC 3021), adresa slouží zařízení.',
+      };
+    } else {
+      d = {
+        net: 'Síť má jedinou adresu a ta patří přímo zařízení.',
+        first: 'Jediná adresa v síti.',
+        last: 'Jediná adresa v síti.',
+        bc: 'U /32 broadcast nemá smysl, v síti je jen jedno zařízení.',
+      };
+    }
+
+    const rows = [
+      ['Síťová adresa', d.net, c.net],
+      ['První použitelná adresa', d.first, c.first],
+      ['Poslední použitelná adresa', d.last, c.last],
+      ['Broadcast', d.bc, c.bc],
+      ['Maska sítě', `Prefix /${c.n} zapsaný po oktetech: ${c.n} ${plural(c.n, 'jednička', 'jedničky', 'jedniček')} zleva, zbytek nuly.`, c.mask],
+      ['Wildcard maska', 'Obrácená maska: z každé jedničky je nula a naopak. Používá se v ACL a OSPF na routerech Cisco.', c.wild],
+    ];
+    $('#addr-list').innerHTML = rows.map(([name, desc, u]) => `
+      <div class="addr">
+        <div><h3>${name}</h3><p>${desc}</p></div>
+        <div><div class="val-dec">${dotted(u)}</div><div class="val-bin">${binHTML(u, c.n)}</div></div>
+      </div>`).join('');
+
+    const ci = classInfo(octets(c.ip)[0]);
+    let borrow = '';
+    if (ci.def !== null) {
+      if (c.n > ci.def) {
+        const b = c.n - ci.def, cnt = pow2(b);
+        borrow = `Oproti výchozí /${ci.def} sis od hostů půjčil ${b} ${bitsWord(b)}: 2<sup>${b}</sup> = ${fmt(cnt)} ${plural(cnt, 'podsíť', 'podsítě', 'podsítí')} po ${fmt(c.total)} ${plural(c.total, 'adrese', 'adresách', 'adresách')}.`;
+      } else if (c.n === ci.def) {
+        borrow = 'Prefix odpovídá výchozí masce třídy, síť není rozdělená na podsítě.';
+      } else {
+        const cnt = pow2(ci.def - c.n);
+        borrow = `Prefix je kratší než výchozí /${ci.def}, taková síť spojuje ${fmt(cnt)} ${plural(cnt, 'síť', 'sítě', 'sítí')} třídy ${ci.cls} (supernet).`;
+      }
+    }
+
+    let usableLab;
+    if (c.n <= 30) usableLab = `${plural(c.usable, 'použitelná adresa', 'použitelné adresy', 'použitelných adres')} pro zařízení (${fmt(c.total)} − 2)`;
+    else if (c.n === 31) usableLab = 'použitelné adresy pro dva routery na spoji';
+    else usableLab = 'použitelná adresa pro jediné zařízení';
+
+    const t = addrType(c.ip);
+    const range = c.first === c.last ? dotted(c.first) : `${dotted(c.first)} – ${dotted(c.last)}`;
+
+    $('#facts').innerHTML = `
+      <div class="fact"><span class="fact-num">${fmt(c.total)}</span><span class="fact-lab">${adresWord(c.total)} v síti celkem (2<sup>${c.h}</sup>)</span></div>
+      <div class="fact"><span class="fact-num ok">${fmt(c.usable)}</span><span class="fact-lab">${usableLab}</span></div>
+      <div class="fact"><h3>Rozsah pro zařízení</h3><p class="mono">${range}</p></div>
+      <div class="fact"><h3>Třída adresy</h3><p><b>${ci.cls}</b>, ${ci.note}</p>
+        ${borrow ? `<p class="small">${borrow}</p>` : ''}
+        <p class="small">Třídy dnes v praxi nahradil CIDR, ale ve výuce je pořád potkáš.</p></div>
+      <div class="fact"><h3>Druh adresy</h3><p><b>${t.name}</b></p><p class="small">${t.desc}</p></div>
+      <div class="fact"><h3>Šestnáctkově</h3><p class="mono">IP ${octets(c.ip).map(hex2).join('.')}<br>maska ${octets(c.mask).map(hex2).join('.')}</p></div>`;
+  }
+
+  /* ---------- Postup výpočtu ---------- */
+  const opRow = (op, lbl, u, n, res) =>
+    `<div class="oprow${res ? ' res' : ''}"><span class="op">${op}</span><span class="lbl">${lbl}</span><span class="bits">${binHTML(u, n)}</span><span class="eq">= ${dotted(u)}</span></div>`;
+  const RULE = '<div class="rule" aria-hidden="true"></div>';
+
+  function maskOctetExplain(c) {
+    const r = c.n % 8;
+    if (c.n === 0) return 'Maska /0 má všechny bity nulové: 0.0.0.0.';
+    if (c.n === 32) return 'Maska /32 má všechny bity jedničkové: 255.255.255.255.';
+    if (r === 0) return 'Oktet samých jedniček je <code>11111111</code> = 128 + 64 + 32 + 16 + 8 + 4 + 2 + 1 = 255, oktet samých nul je 0.';
+    const k = Math.floor(c.n / 8);
+    const m = octets(c.mask)[k];
+    const parts = W.slice(0, r);
+    const sum = parts.length > 1 ? `${parts.join(' + ')} = ${m}` : `${m}`;
+    return `${k + 1}. oktet je rozdělený hranicí: <code>${bin8(m)}</code> = ${sum}. Sečteš váhy bitů, kde je jednička.`;
+  }
+
+  function renderSteps(c) {
+    const n = c.n, h = c.h;
+    let count;
+    if (n <= 30) {
+      count = `<p>Hostitelských bitů je 32 − ${n} = ${h}. Každý bit navíc zdvojnásobí počet možností, takže adres je 2<sup>${h}</sup>. Zařízením jich můžeš dát o dvě méně, protože síťovou adresu a broadcast nikdo dostat nemůže.</p>
+        <div class="formula">2<sup>${h}</sup> = ${fmt(c.total)}<br>${fmt(c.total)} − 2 = ${fmt(c.usable)} ${plural(c.usable, 'zařízení', 'zařízení', 'zařízení')}</div>`;
+    } else if (n === 31) {
+      count = `<p>Hostitelský bit je jen jeden, takže adresy jsou 2<sup>1</sup> = 2. U /31 se nic neodečítá: obě adresy dostanou dva routery na dvoubodovém spoji (RFC 3021).</p>
+        <div class="formula">2<sup>1</sup> = 2</div>`;
+    } else {
+      count = `<p>Hostitelských bitů je 0, takže adresa je 2<sup>0</sup> = 1. Taková „síť“ je jediné zařízení. Používá se třeba pro loopback rozhraní routeru nebo v pravidlech firewallu.</p>
+        <div class="formula">2<sup>0</sup> = 1</div>`;
+    }
+
+    const steps = [
+      {
+        t: 'Z prefixu udělej masku',
+        body: `<p>/${n} znamená ${n} ${plural(n, 'jedničku', 'jedničky', 'jedniček')} zleva, zbytek tvoří nuly (${h} ${bitsWord(h)}). Každou osmici bitů pak převedeš na desítkové číslo.</p>
+          <div class="ops">${opRow('', 'Maska', c.mask, n)}</div>
+          <p class="after">${maskOctetExplain(c)}</p>`,
+      },
+      {
+        t: 'Síťová adresa = IP AND maska',
+        body: `<p>AND dá jedničku jen tam, kde ji mají oba řádky. Kde má maska nulu, vyjde nula, takže se hostitelská část IP adresy vynuluje. Síťová část zůstane, jak byla.</p>
+          <div class="ops">${opRow('', 'IP', c.ip, n)}${opRow('AND', 'Maska', c.mask, n)}${RULE}${opRow('', 'Síť', c.net, n, true)}</div>`,
+      },
+      {
+        t: 'Wildcard = NOT maska',
+        body: `<p>Každý bit masky se obrátí. Z hlavy to spočítáš jako 255 minus každý oktet masky: 255.255.255.255 − ${dotted(c.mask)} = ${dotted(c.wild)}.</p>
+          <div class="ops">${opRow('NOT', 'Maska', c.mask, n)}${RULE}${opRow('', 'Wildcard', c.wild, n, true)}</div>`,
+      },
+      {
+        t: 'Broadcast = síť OR wildcard',
+        body: `<p>OR dá jedničku tam, kde ji má aspoň jeden řádek. Všechny hostitelské bity se tak nastaví na 1, síťové zůstanou.</p>
+          <div class="ops">${opRow('', 'Síť', c.net, n)}${opRow('OR', 'Wildcard', c.wild, n)}${RULE}${opRow('', 'Broadcast', c.bc, n, true)}</div>`,
+      },
+      { t: 'Spočítej adresy', body: count },
+    ];
+
+    $('#steps').innerHTML = steps.map((s) => `<li class="step"><div><h3>${s.t}</h3>${s.body}</div></li>`).join('');
+  }
+
+  /* ---------- Velikost bloku ---------- */
+  function renderBlock(c) {
+    const n = c.n;
+    const idx = n === 32 ? 3 : Math.floor(n / 8);        // oktet, kde maska není 255
+    const m = octets(c.mask)[idx];
+    const size = 256 - m;
+    const count = 256 / size;
+    const v = octets(c.ip)[idx];
+    const start = Math.floor(v / size) * size;
+    const end = start + size - 1;
+    const k = idx + 1;
+
+    $('#block-head').textContent =
+      `${k}. oktet (0–255) rozdělený na ${fmt(count)} ${plural(count, 'blok', 'bloky', 'bloků')} po ${size} ${plural(size, 'adrese', 'adresách', 'adresách')}`;
+
+    // proužek s bloky
+    const bar = $('#bbar');
+    bar.classList.toggle('dense', count > 32);
+    let html = '';
+    for (let s = 0; s < count; s++) {
+      html += `<div class="blk${s * size === start ? ' cur' : ''}${s % 2 ? ' alt' : ''}"></div>`;
+    }
+    bar.innerHTML = html;
+
+    const mark = $('#bmark');
+    mark.style.left = ((v + 0.5) / 256 * 100) + '%';
+    $('#bmark-label').textContent = `IP: ${v}`;
+
+    // popisky začátků bloků, jen pokud se vejdou
+    const width = bar.clientWidth || 600;
+    const maxLabels = Math.max(2, Math.floor(width / 38));
+    const labels = [];
+    if (count <= maxLabels) {
+      for (let s = 0; s < count; s++) labels.push(s * size);
+    } else {
+      labels.push(0);
+      if (start > 0) labels.push(start);
+    }
+    let lh = labels.map((x) => `<span class="${x === 0 ? 'first' : ''}" style="left:${x / 256 * 100}%">${x}</span>`).join('');
+    lh += `<span class="last" style="left:100%">255</span>`;
+    $('#blabels').innerHTML = lh;
+
+    // vysvětlení
+    let text;
+    const list = count <= 8
+      ? Array.from({ length: count }, (_, s) => s * size).join(', ')
+      : `${[0, 1, 2, 3].map((s) => s * size).join(', ')} … ${256 - size}`;
+    if (n === 0) {
+      text = 'S prefixem /0 nepatří síti ani jeden bit, je to celý adresní prostor IPv4. Maska je v 1. oktetu 0, blok má velikost 256 a existuje jediná „síť“ 0.0.0.0 až 255.255.255.255. Používá se jako výchozí cesta 0.0.0.0/0.';
+    } else if (n === 32) {
+      text = `S prefixem /32 je maska ve 4. oktetu 255, blok má velikost 256 − 255 = <b>1</b>. Každá adresa je samostatná síť, takže síť i broadcast jsou ${dotted(c.net)}.`;
+    } else if (n % 8 === 0) {
+      const head = idx === 1 ? '1. oktet patří síti celý' : `Oktety 1–${idx} patří síti celé`;
+      text = `Prefix /${n} končí přesně na hranici oktetu. ${head} (maska 255), ${k}. oktet má masku 0 a patří celý hostům. Blok má velikost 256 − 0 = <b>256</b>, v ${k}. oktetu je tedy jen jedna síť od 0 do 255. Proto je síťová adresa ${dotted(c.net)} a broadcast ${dotted(c.bc)}.`;
+    } else {
+      text = `Maska má v ${k}. oktetu hodnotu <b>${m}</b>. Velikost bloku je 256 − ${m} = <b>${size}</b>, takže sítě v tomto oktetu začínají na ${list}. Tvoje IP tam má hodnotu <b>${v}</b>, patří tedy do bloku <b>${start}–${end}</b>. Proto je síťová adresa ${dotted(c.net)} a broadcast ${dotted(c.bc)}.`;
+    }
+    $('#block-text').innerHTML = text;
+  }
+
+  /* ============================================================
+     Vysvětlení, co se právě změnilo
+     ============================================================ */
+  const deltaEl = $('#delta');
+
+  function deltaText(a, b, info) {
+    if (info.kind === 'preset') return `Načten příklad ${dotted(b.ip)}/${b.n}. Zkus teď posouvat hranici a sleduj, co se děje s maskou a počtem adres.`;
+    const out = [];
+    if (a.n !== b.n) {
+      const k = Math.abs(b.n - a.n);
+      const times = fmt(pow2(k));
+      if (b.n > a.n) {
+        out.push(`Z /${a.n} na /${b.n}: síti ${plural(k, 'přibyl', 'přibyly', 'přibylo')} ${k} ${bitsWord(k)}, hostům stejný počet ubyl. Adres v síti je ${times}× méně (${fmt(a.total)} → ${fmt(b.total)}).`);
+      } else {
+        out.push(`Z /${a.n} na /${b.n}: hostům ${plural(k, 'přibyl', 'přibyly', 'přibylo')} ${k} ${bitsWord(k)}, síti stejný počet ubyl. Adres v síti je ${times}× víc (${fmt(a.total)} → ${fmt(b.total)}).`);
+      }
+      if (a.net !== b.net) out.push(`Síťová adresa se změnila na ${dotted(b.net)}.`);
+      else out.push(`Síťová adresa zůstala ${dotted(b.net)}, broadcast je teď ${dotted(b.bc)}.`);
+    } else if (a.ip !== b.ip) {
+      const pre = info.kind === 'bit' ? `Přepnul jsi ${info.i + 1}. bit IP adresy (váha ${W[info.i % 8]}). ` : '';
+      if (a.net === b.net) out.push(`${pre}IP je teď ${dotted(b.ip)} a pořád patří do stejné sítě ${dotted(b.net)}/${b.n}, protože se změnila jen hostitelská část.`);
+      else out.push(`${pre}IP je teď ${dotted(b.ip)} a patří do jiné sítě ${dotted(b.net)}/${b.n}, protože se změnila síťová část adresy.`);
+    } else {
+      out.push(`Hranice je zpátky na /${b.n}.`);
+    }
+    return out.join(' ');
+  }
+
+  /* Jediné místo, kde se mění stav */
+  function commit(next, info = {}) {
+    const before = info.base || calc(state.ip, state.n);
+    if (!info.force && next.ip === state.ip && next.n === state.n) return;
+    state = { ip: next.ip >>> 0, n: next.n };
+    render(info.source);
+    deltaEl.textContent = deltaText(before, calc(state.ip, state.n), info);
+  }
+
+  const setCidr = (n, info = {}) => commit({ ip: state.ip, n: Math.max(0, Math.min(32, n)) }, info);
+
+  function toggleIpBit(i) {
+    commit({ ip: (state.ip ^ (1 << (31 - i))) >>> 0, n: state.n }, { kind: 'bit', i });
+  }
+  // bit masky: z jedničky udělá nulu (a vše vpravo taky), z nuly jedničku (a vše vlevo taky)
+  function toggleMaskBit(i) {
+    setCidr(i < state.n ? i : i + 1, { kind: 'mask' });
+  }
+
+  /* ============================================================
+     Ovládání
+     ============================================================ */
+  // tažení posuvníku
+  let dragBase = null;
+  function pick(e) {
+    const x = e.clientX - track.getBoundingClientRect().left;
+    let best = 0, dist = Infinity;
+    xs.forEach((v, i) => { const d = Math.abs(v - x); if (d < dist) { dist = d; best = i; } });
+    setCidr(best, { kind: 'slider', base: dragBase });
+  }
+  track.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    dragBase = calc(state.ip, state.n);
+    track.setPointerCapture(e.pointerId);
+    track.classList.add('dragging');
+    handle.focus({ preventScroll: true });
+    pick(e);
+  });
+  track.addEventListener('pointermove', (e) => { if (track.hasPointerCapture(e.pointerId)) pick(e); });
+  const endDrag = () => { track.classList.remove('dragging'); dragBase = null; };
+  track.addEventListener('pointerup', endDrag);
+  track.addEventListener('pointercancel', endDrag);
+
+  // klávesnice na posuvníku
+  handle.addEventListener('keydown', (e) => {
+    const n = state.n;
+    let next = null;
+    switch (e.key) {
+      case 'ArrowRight': case 'ArrowUp': next = n + 1; break;
+      case 'ArrowLeft': case 'ArrowDown': next = n - 1; break;
+      case 'PageUp': next = Math.floor(n / 8) * 8 + 8; break;
+      case 'PageDown': next = Math.ceil(n / 8) * 8 - 8; break;
+      case 'Home': next = 0; break;
+      case 'End': next = 32; break;
+      default: return;
+    }
+    e.preventDefault();
+    setCidr(next, { kind: 'key' });
+  });
+
+  $('#dec').addEventListener('click', () => setCidr(state.n - 1, { kind: 'button' }));
+  $('#inc').addEventListener('click', () => setCidr(state.n + 1, { kind: 'button' }));
+
+  // chybové hlášky
+  const errorEl = $('#error');
+  function showErrors() {
+    const msgs = Object.values(errors).filter(Boolean);
+    errorEl.hidden = msgs.length === 0;
+    errorEl.innerHTML = msgs.join('<br>');
+    ipInput.setAttribute('aria-invalid', errors.ip ? 'true' : 'false');
+    maskInput.setAttribute('aria-invalid', errors.mask ? 'true' : 'false');
+  }
+
+  // IP: při psaní se počítá hned, chyba se ukáže až po opuštění pole
+  ipInput.addEventListener('input', () => {
+    const r = parseIP(ipInput.value);
+    if (r.error) return;
+    if (errors.ip) { errors.ip = ''; showErrors(); }
+    commit({ ip: r.ip, n: r.cidr ?? state.n }, { kind: 'input', source: 'ip' });
+  });
+  ipInput.addEventListener('change', () => {
+    const r = parseIP(ipInput.value);
+    errors.ip = r.error || '';
+    showErrors();
+    if (!r.error) ipInput.value = dotted(state.ip);
+  });
+
+  maskInput.addEventListener('input', () => {
+    const r = parseMask(maskInput.value);
+    if (r.error) return;
+    if (errors.mask) { errors.mask = ''; showErrors(); }
+    setCidr(r.cidr, { kind: 'input', source: 'mask' });
+  });
+  maskInput.addEventListener('change', () => {
+    const r = parseMask(maskInput.value);
+    errors.mask = r.error || '';
+    showErrors();
+    if (!r.error) maskInput.value = dotted(maskOf(state.n));
+  });
+
+  cidrInput.addEventListener('input', () => {
+    const v = cidrInput.value.trim();
+    if (!/^\d{1,2}$/.test(v) || Number(v) > 32) return;
+    setCidr(Number(v), { kind: 'input', source: 'cidr' });
+  });
+  cidrInput.addEventListener('change', () => { cidrInput.value = state.n; });
+
+  // příklady
+  document.querySelectorAll('.chip[data-v]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const r = parseIP(btn.dataset.v);
+      errors.ip = errors.mask = ''; showErrors();
+      commit({ ip: r.ip, n: r.cidr }, { kind: 'preset', force: true });
+    });
+  });
+
+  const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  $('#random').addEventListener('click', () => {
+    const r = Math.random();
+    let ip, n;
+    if (r < 0.35) { ip = fromOct(192, 168, rand(0, 255), rand(1, 254)); n = rand(24, 30); }
+    else if (r < 0.6) { ip = fromOct(172, rand(16, 31), rand(0, 255), rand(1, 254)); n = rand(16, 30); }
+    else if (r < 0.8) { ip = fromOct(10, rand(0, 255), rand(0, 255), rand(1, 254)); n = rand(8, 30); }
+    else {
+      const first = pickOne([23, 31, 45, 62, 81, 85, 89, 91, 109, 130, 146, 151, 185, 193, 195, 212, 217]);
+      ip = fromOct(first, rand(0, 255), rand(0, 255), rand(1, 254)); n = rand(8, 30);
+    }
+    errors.ip = errors.mask = ''; showErrors();
+    commit({ ip, n }, { kind: 'preset', force: true });
+  });
+
+  // odkaz s #ip/prefix
+  function loadFromHash() {
+    const h = decodeURIComponent(location.hash.slice(1));
+    if (!h) return false;
+    const r = parseIP(h);
+    if (r.error) return false;
+    state = { ip: r.ip, n: r.cidr ?? state.n };
+    return true;
+  }
+  window.addEventListener('hashchange', () => {
+    const cur = '#' + dotted(state.ip) + '/' + state.n;
+    if (location.hash === cur) return;
+    const r = parseIP(decodeURIComponent(location.hash.slice(1)));
+    if (!r.error) commit({ ip: r.ip, n: r.cidr ?? state.n }, { kind: 'preset', force: true });
+  });
+
+  /* ============================================================
+     Start
+     ============================================================ */
+  loadFromHash();
+  render();
+  layout();
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => { layout(); renderBlock(calc(state.ip, state.n)); }).observe(strip);
+  } else {
+    window.addEventListener('resize', layout);
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
+})();
+</script>
+</body>
+</html>
